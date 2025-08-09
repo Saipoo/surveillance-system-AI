@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
-import { CameraFeed } from "@/components/ui/camera-feed";
+import { CameraFeed } from "@/components/camera-feed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
