@@ -14,7 +14,7 @@ import { EmergencyType } from '@/lib/types';
 
 const emergencyTypes: [EmergencyType, ...EmergencyType[]] = ['Fall Detected', 'SOS Hand Sign', 'Chest Pain'];
 
-export const AnalyzeEmergencyInputSchema = z.object({
+const AnalyzeEmergencyInputSchema = z.object({
   imageDataUri: z
     .string()
     .describe(
@@ -24,7 +24,7 @@ export const AnalyzeEmergencyInputSchema = z.object({
 export type AnalyzeEmergencyInput = z.infer<typeof AnalyzeEmergencyInputSchema>;
 
 
-export const AnalyzeEmergencyOutputSchema = z.object({
+const AnalyzeEmergencyOutputSchema = z.object({
   emergencyType: z.enum(emergencyTypes).nullable().describe("The type of emergency detected in the image, or null if no emergency is detected."),
 });
 export type AnalyzeEmergencyOutput = z.infer<typeof AnalyzeEmergencyOutputSchema>;
