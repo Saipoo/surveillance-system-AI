@@ -14,7 +14,7 @@ import { MaskStatus } from '@/lib/types';
 
 const maskStatuses: [MaskStatus, ...MaskStatus[]] = ['Worn', 'Not Worn', 'Unknown'];
 
-export const AnalyzeMaskInputSchema = z.object({
+const AnalyzeMaskInputSchema = z.object({
   imageDataUri: z
     .string()
     .describe(
@@ -24,7 +24,7 @@ export const AnalyzeMaskInputSchema = z.object({
 export type AnalyzeMaskInput = z.infer<typeof AnalyzeMaskInputSchema>;
 
 
-export const AnalyzeMaskOutputSchema = z.object({
+const AnalyzeMaskOutputSchema = z.object({
   maskStatus: z.enum(maskStatuses).describe("The status of face mask wearing in the image."),
 });
 export type AnalyzeMaskOutput = z.infer<typeof AnalyzeMaskOutputSchema>;
