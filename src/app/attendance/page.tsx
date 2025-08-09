@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { CameraFeed, type CameraFeedRef } from "@/components/camera-feed";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,20 @@ export default function AttendancePage() {
 
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Load students from localStorage on component mount
+    const storedStudents = localStorage.getItem("students");
+    if (storedStudents) {
+      setStudents(JSON.parse(storedStudents));
+    }
+  }, []);
+
+  const saveStudents = (updatedStudents: Student[]) => {
+    setStudents(updatedStudents);
+    localStorage.setItem("students", JSON.stringify(updatedStudents));
+  };
+
+
   const handleRegister = () => {
     if (!newStudentName || !newStudentUsn) {
       toast({ variant: "destructive", title: "Missing Information", description: "Please enter both name and USN." });
@@ -63,7 +77,7 @@ export default function AttendancePage() {
         semester: "7th Sem",
         faceImage,
       };
-      setStudents([...students, newStudent]);
+      saveStudents([...students, newStudent]);
       setNewStudentName("");
       setNewStudentUsn("");
       toast({ title: "Student Registered", description: `${newStudent.name} has been added.` });

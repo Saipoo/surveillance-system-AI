@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { CameraFeed, type CameraFeedRef } from "@/components/camera-feed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { summarizeEmergencyReport } from "@/ai/flows/summarize-emergency-flow";
+import { analyzeImageForEmergency } from "@/ai/flows/analyze-emergency-flow";
 import { playAlarm } from "@/lib/utils";
 import type { EmergencyLog, EmergencyType } from "@/lib/types";
 import { exportToExcel } from "@/lib/excel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Siren, Loader2, Download } from "lucide-react";
+import { Siren, Loader2, Download, Video } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const emergencyDetails: Record<EmergencyType, { treatment: string }> = {
@@ -22,27 +23,20 @@ const emergencyDetails: Record<EmergencyType, { treatment: string }> = {
 
 export default function EmergencyDetectionPage() {
   const cameraRef = useRef<CameraFeedRef>(null);
-  const [alert, setAlert] = useState<{ type: EmergencyType; treatment: string } | null>(null);
+  const [alertInfo, setAlertInfo] = useState<{ type: EmergencyType; treatment: string } | null>(null);
   const [logs, setLogs] = useState<EmergencyLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const detectionInterval = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  const handleSimulateEmergency = async (type: EmergencyType) => {
-    if (!cameraRef.current?.isCameraOn) {
-      toast({ variant: "destructive", title: "Camera is off", description: "Please turn on the camera to simulate an emergency." });
-      return;
-    }
-    
-    const imageDataUrl = cameraRef.current.capture();
-    if (!imageDataUrl) {
-      toast({ variant: "destructive", title: "Capture Failed", description: "Could not capture an image from the camera." });
-      return;
-    }
+  const handleEmergency = async (type: EmergencyType, imageDataUrl: string) => {
+    if (isProcessing) return; // Prevent multiple triggers
 
-    const { treatment } = emergencyDetails[type];
-    setAlert({ type, treatment });
-    playAlarm();
     setIsProcessing(true);
+    const { treatment } = emergencyDetails[type];
+    setAlertInfo({ type, treatment });
+    playAlarm();
     
     try {
       const { summary } = await summarizeEmergencyReport({
@@ -67,28 +61,72 @@ export default function EmergencyDetectionPage() {
       console.error("Error processing emergency:", error);
       toast({ variant: "destructive", title: "AI Error", description: "Could not generate an AI summary for the event." });
     } finally {
-      setIsProcessing(false);
-      setTimeout(() => setAlert(null), 8000);
+      setTimeout(() => {
+        setAlertInfo(null);
+        setIsProcessing(false);
+      }, 8000); // Clear alert after 8 seconds
     }
   };
+
+  const startDetection = () => {
+    if (!cameraRef.current?.isCameraOn) {
+      toast({ variant: "destructive", title: "Camera is off", description: "Please turn on the camera to start detection." });
+      return;
+    }
+    setIsDetecting(true);
+    toast({ title: "Detection Started", description: "Actively monitoring for emergencies." });
+
+    detectionInterval.current = setInterval(async () => {
+      if (isProcessing || !cameraRef.current) return;
+
+      const imageDataUrl = cameraRef.current.capture();
+      if (imageDataUrl) {
+        try {
+          const { emergencyType } = await analyzeImageForEmergency({ imageDataUri: imageDataUrl });
+          if (emergencyType && emergencyDetails[emergencyType]) {
+            handleEmergency(emergencyType, imageDataUrl);
+          }
+        } catch (error) {
+          console.error("Error analyzing image:", error);
+          // Don't show toast here to avoid spamming the user
+        }
+      }
+    }, 5000); // Check every 5 seconds
+  };
+
+  const stopDetection = () => {
+    setIsDetecting(false);
+    if (detectionInterval.current) {
+      clearInterval(detectionInterval.current);
+    }
+    toast({ title: "Detection Stopped" });
+  };
+  
+  useEffect(() => {
+    return () => {
+        if (detectionInterval.current) {
+            clearInterval(detectionInterval.current)
+        }
+    }
+  }, [])
 
   return (
     <div className="container mx-auto py-4">
       <PageHeader
         title="Emergency Detection System"
-        description="Detects emergency gestures or health issues and suggests immediate actions."
+        description="Automatically detects emergency gestures or health issues and suggests immediate actions."
       />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <CameraFeed ref={cameraRef}>
-            {alert && (
+            {alertInfo && (
               <div className="absolute inset-0 bg-red-500/30 animate-pulse flex items-center justify-center p-4">
                 <Alert variant="destructive" className="max-w-md bg-background/90">
                   <Siren className="h-5 w-5" />
-                  <AlertTitle className="text-xl font-bold font-headline animate-pulse">EMERGENCY: {alert.type}</AlertTitle>
+                  <AlertTitle className="text-xl font-bold font-headline animate-pulse">EMERGENCY: {alertInfo.type}</AlertTitle>
                   <AlertDescription className="mt-2">
                     <p className="font-semibold">Suggested Action:</p>
-                    <p>{alert.treatment}</p>
+                    <p>{alertInfo.treatment}</p>
                   </AlertDescription>
                 </Alert>
               </div>
@@ -98,16 +136,21 @@ export default function EmergencyDetectionPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Simulate Emergency</CardTitle>
-              <CardDescription>Trigger a simulated emergency to test the system.</CardDescription>
+              <CardTitle>System Control</CardTitle>
+              <CardDescription>Start or stop automatic emergency detection.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {(Object.keys(emergencyDetails) as EmergencyType[]).map((type) => (
-                <Button key={type} onClick={() => handleSimulateEmergency(type)} disabled={isProcessing} className="w-full">
-                  {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Simulate {type}
+            <CardContent>
+              {isDetecting ? (
+                <Button onClick={stopDetection} variant="destructive" className="w-full">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Stop Detection
                 </Button>
-              ))}
+              ) : (
+                <Button onClick={startDetection} className="w-full" disabled={isProcessing}>
+                  <Video className="mr-2 h-4 w-4" />
+                  Start Automatic Detection
+                </Button>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -118,10 +161,15 @@ export default function EmergencyDetectionPage() {
                 {isProcessing ? (
                     <div className="flex items-center text-muted-foreground">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        <span>Generating AI summary and logging event...</span>
+                        <span>Emergency detected! Logging event...</span>
+                    </div>
+                ) : isDetecting ? (
+                     <div className="flex items-center text-green-600">
+                        <Siren className="mr-2 h-4 w-4" />
+                        <span>System is actively monitoring...</span>
                     </div>
                 ) : (
-                    <p className="text-muted-foreground">System is idle. Ready to detect emergencies.</p>
+                    <p className="text-muted-foreground">System is idle. Start detection to monitor.</p>
                 )}
             </CardContent>
           </Card>

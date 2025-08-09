@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { CameraFeed, type CameraFeedRef } from "@/components/camera-feed";
 import { Button } from "@/components/ui/button";
@@ -10,42 +10,63 @@ import { exportToExcel } from "@/lib/excel";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import { analyzeImageForMask } from "@/ai/flows/analyze-mask-flow";
 
+type MaskStatus = 'Worn' | 'Not Worn' | 'Unknown';
 type LogEntry = {
   Date: string;
   Time: string;
-  'Mask Status': 'Worn' | 'Not Worn';
+  'Mask Status': MaskStatus;
 };
 
 export default function MaskDetectionPage() {
   const cameraRef = useRef<CameraFeedRef>(null);
   const [isDetecting, setIsDetecting] = useState(false);
-  const [maskStatus, setMaskStatus] = useState<'Worn' | 'Not Worn' | null>(null);
+  const [maskStatus, setMaskStatus] = useState<MaskStatus | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const detectionInterval = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const handleToggleDetection = () => {
     if (isDetecting) {
+      stopDetection();
+    } else {
+      startDetection();
+    }
+  };
+
+  const startDetection = () => {
+    if (!cameraRef.current?.isCameraOn) {
+      toast({ variant: "destructive", title: "Camera is off", description: "Please turn on the camera to start detection." });
+      return;
+    }
+    setIsDetecting(true);
+    toast({ title: "Mask detection started" });
+    detectionInterval.current = setInterval(async () => {
+      const imageDataUrl = cameraRef.current?.capture();
+      if (imageDataUrl) {
+        try {
+          const { maskStatus: status } = await analyzeImageForMask({ imageDataUri: imageDataUrl });
+          setMaskStatus(status);
+          if(status !== 'Unknown') {
+             logEvent(status);
+          }
+        } catch (error) {
+          console.error("Error analyzing image for mask:", error);
+          setMaskStatus("Unknown");
+        }
+      }
+    }, 2500);
+  };
+  
+  const stopDetection = () => {
       setIsDetecting(false);
       if (detectionInterval.current) {
         clearInterval(detectionInterval.current);
       }
       setMaskStatus(null);
-    } else {
-      if (!cameraRef.current?.isCameraOn) {
-        toast({ variant: "destructive", title: "Camera is off", description: "Please turn on the camera to start detection." });
-        return;
-      }
-      setIsDetecting(true);
-      detectionInterval.current = setInterval(() => {
-        const isWorn = Math.random() > 0.4;
-        const status = isWorn ? 'Worn' : 'Not Worn';
-        setMaskStatus(status);
-        logEvent(status);
-      }, 2500);
-    }
+      toast({ title: "Mask detection stopped" });
   };
   
   const logEvent = (status: 'Worn' | 'Not Worn') => {
@@ -55,13 +76,22 @@ export default function MaskDetectionPage() {
       Time: now.toLocaleTimeString(),
       'Mask Status': status,
     };
-    setLogs(prevLogs => [...prevLogs, newLog]);
+    setLogs(prevLogs => [newLog, ...prevLogs]); // Add to the top of the list
   };
+  
+  useEffect(() => {
+      return () => {
+          if (detectionInterval.current) {
+              clearInterval(detectionInterval.current)
+          }
+      }
+  }, [])
 
   const getStatusMessage = () => {
     if (!maskStatus) return null;
-    if (maskStatus === 'Worn') return "Good, stay safe!";
-    return "Face mask is necessary for safety from pollution.";
+    if (maskStatus === 'Worn') return "Mask detected. Good, stay safe!";
+    if (maskStatus === 'Not Worn') return "No mask detected. Please wear a mask for safety.";
+    return "Could not determine mask status.";
   };
 
   return (
@@ -76,11 +106,13 @@ export default function MaskDetectionPage() {
                 {maskStatus && (
                     <div className={cn("absolute inset-0 flex items-center justify-center p-4", {
                         "bg-green-500/20": maskStatus === "Worn",
-                        "bg-red-500/20": maskStatus === "Not Worn"
+                        "bg-red-500/20": maskStatus === "Not Worn",
+                        "bg-yellow-500/20": maskStatus === "Unknown",
                     })}>
-                        <Badge variant={maskStatus === 'Worn' ? 'default' : 'destructive'} className={cn("text-lg p-3", {
+                        <Badge variant={maskStatus === 'Worn' ? 'default' : (maskStatus === 'Not Worn' ? 'destructive' : 'secondary')} className={cn("text-lg p-3", {
                             "bg-green-600": maskStatus === "Worn",
-                            "bg-red-600": maskStatus === "Not Worn"
+                            "bg-red-600": maskStatus === "Not Worn",
+                            "bg-yellow-500 text-black": maskStatus === "Unknown"
                         })}>
                             {getStatusMessage()}
                         </Badge>
@@ -95,6 +127,7 @@ export default function MaskDetectionPage() {
             </CardHeader>
             <CardContent>
               <Button onClick={handleToggleDetection} className="w-full" variant={isDetecting ? "destructive" : "default"}>
+                {isDetecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {isDetecting ? 'Stop Detection' : 'Start Detection'}
               </Button>
             </CardContent>
@@ -108,7 +141,8 @@ export default function MaskDetectionPage() {
                     <div className="text-center">
                         <p className={cn("text-2xl font-bold", {
                             "text-green-600": maskStatus === "Worn",
-                            "text-red-600": maskStatus === "Not Worn"
+                            "text-red-600": maskStatus === "Not Worn",
+                            "text-yellow-600": maskStatus === "Unknown"
                         })}>
                             Mask {maskStatus}
                         </p>
@@ -149,7 +183,7 @@ export default function MaskDetectionPage() {
                                 <TableCell>{log.Date}</TableCell>
                                 <TableCell>{log.Time}</TableCell>
                                 <TableCell>
-                                    <Badge variant={log['Mask Status'] === 'Worn' ? 'default' : 'destructive'}>
+                                    <Badge variant={log['Mask Status'] === 'Worn' ? 'default' : (log['Mask Status'] === 'Not Worn' ? 'destructive' : 'secondary')}>
                                         {log['Mask Status']}
                                     </Badge>
                                 </TableCell>

@@ -14,3 +14,5 @@ export type EmergencyLog = {
   'Type of Emergency': EmergencyType;
   'Suggested Treatment': string;
 };
+
+export type MaskStatus = 'Worn' | 'Not Worn' | 'Unknown';
