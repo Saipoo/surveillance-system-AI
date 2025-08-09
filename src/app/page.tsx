@@ -9,12 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/excel";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Download } from "lucide-react";
 
 type LogEntry = {
   Date: string;
   Time: string;
   'Uniform Status': 'Granted' | 'Denied';
-  'Student Image': string;
 };
 
 export default function UniformDetectionPage() {
@@ -77,11 +78,8 @@ export default function UniformDetectionPage() {
       Date: now.toLocaleDateString(),
       Time: now.toLocaleTimeString(),
       'Uniform Status': status,
-      'Student Image': `image_${now.getTime()}.jpg`, // Placeholder for image data
     };
     setLogs(prevLogs => [...prevLogs, newLog]);
-    // Auto-export on each log
-    exportToExcel([...logs, newLog], "Uniform Logs", "uniform_detection_logs");
   };
 
   return (
@@ -92,23 +90,15 @@ export default function UniformDetectionPage() {
       />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Live Camera Feed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative">
-                <CameraFeed ref={cameraRef} />
-                {detectionStatus && (
-                   <div className="absolute top-4 left-4">
-                    <Badge variant={detectionStatus === 'Granted' ? 'default' : 'destructive'} className={`text-lg p-2 ${detectionStatus === 'Granted' ? 'bg-green-500' : 'bg-red-500'}`}>
-                      Permission {detectionStatus}
-                    </Badge>
-                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <CameraFeed ref={cameraRef}>
+            {detectionStatus && (
+               <div className="absolute top-4 left-4">
+                <Badge variant={detectionStatus === 'Granted' ? 'default' : 'destructive'} className={`text-lg p-2 ${detectionStatus === 'Granted' ? 'bg-green-500' : 'bg-red-500'}`}>
+                  Permission {detectionStatus}
+                </Badge>
+               </div>
+            )}
+          </CameraFeed>
         </div>
         <div className="space-y-6">
           <Card>
@@ -138,6 +128,47 @@ export default function UniformDetectionPage() {
           </Card>
         </div>
       </div>
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Detection Logs</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(logs, "Uniform Logs", "uniform_detection_logs")} disabled={logs.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Download Logs
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Uniform Status</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {logs.length > 0 ? (
+                        logs.map((log, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{log.Date}</TableCell>
+                                <TableCell>{log.Time}</TableCell>
+                                <TableCell>
+                                    <Badge variant={log['Uniform Status'] === 'Granted' ? 'default' : 'destructive'}>
+                                        {log['Uniform Status']}
+                                    </Badge>
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={3} className="text-center">No logs yet.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

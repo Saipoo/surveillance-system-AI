@@ -11,7 +11,8 @@ import { playAlarm } from "@/lib/utils";
 import type { EmergencyLog, EmergencyType } from "@/lib/types";
 import { exportToExcel } from "@/lib/excel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Siren, Loader2 } from "lucide-react";
+import { Siren, Loader2, Download } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const emergencyDetails: Record<EmergencyType, { treatment: string }> = {
   'Fall Detected': { treatment: "Check for consciousness and injuries. Call for medical assistance if needed. Do not move if a spinal injury is suspected." },
@@ -56,14 +57,10 @@ export default function EmergencyDetectionPage() {
         Date: new Date().toLocaleDateString(),
         Time: new Date().toLocaleTimeString(),
         'Type of Emergency': type,
-        'Suggested Treatment': summary, // Using the AI summary
-        'Student Image': `emergency_${Date.now()}.jpg`,
+        'Suggested Treatment': summary,
       };
       
-      const updatedLogs = [...logs, newLog];
-      setLogs(updatedLogs);
-      exportToExcel(updatedLogs, "Emergency Logs", "emergency_logs");
-
+      setLogs(prevLogs => [...prevLogs, newLog]);
       toast({ title: "Emergency Logged", description: "The event has been recorded." });
 
     } catch (error) {
@@ -130,6 +127,45 @@ export default function EmergencyDetectionPage() {
           </Card>
         </div>
       </div>
+       <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Emergency Logs</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(logs, "Emergency Logs", "emergency_logs")} disabled={logs.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              Download Logs
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Type of Emergency</TableHead>
+                        <TableHead>Suggested Treatment (AI Summary)</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {logs.length > 0 ? (
+                        logs.map((log, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{log.Date}</TableCell>
+                                <TableCell>{log.Time}</TableCell>
+                                <TableCell>{log['Type of Emergency']}</TableCell>
+                                <TableCell className="max-w-sm">{log['Suggested Treatment']}</TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={4} className="text-center">No emergencies logged yet.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

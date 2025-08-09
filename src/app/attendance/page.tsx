@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Student } from "@/lib/types";
 import { exportToExcel } from "@/lib/excel";
 import Image from "next/image";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Download } from "lucide-react";
 
 const vtuSubjects = [
   "Machine Learning",
@@ -109,9 +111,7 @@ export default function AttendancePage() {
             Subject: selectedSubject,
             'Attendance Status': 'Marked',
         };
-        const updatedLogs = [...logs, newLog];
-        setLogs(updatedLogs);
-        exportToExcel(updatedLogs, "Attendance", "attendance_logs");
+        setLogs(prevLogs => [...prevLogs, newLog]);
         toast({ title: "Attendance Marked", description: `${recognizedStudent.name} marked present for ${selectedSubject}.` });
         setRecognizedStudent(null);
         setSelectedSubject("");
@@ -201,9 +201,52 @@ export default function AttendancePage() {
                 </CardContent>
             </Card>
           )}
-
         </div>
       </div>
+
+       <Card className="mt-6">
+        <CardHeader>
+            <div className="flex items-center justify-between">
+                <CardTitle>Attendance Logs</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportToExcel(logs, "Attendance", "attendance_logs")} disabled={logs.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Logs
+                </Button>
+            </div>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>USN</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Status</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {logs.length > 0 ? (
+                        logs.map((log, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{log.Date}</TableCell>
+                                <TableCell>{log.Time}</TableCell>
+                                <TableCell>{log.Name}</TableCell>
+                                <TableCell>{log.USN}</TableCell>
+                                <TableCell>{log.Subject}</TableCell>
+                                <TableCell>{log['Attendance Status']}</TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={6} className="text-center">No attendance marked yet.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

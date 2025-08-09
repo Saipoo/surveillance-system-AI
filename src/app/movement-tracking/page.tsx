@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/excel";
-import { Timer, Play, StopCircle } from "lucide-react";
+import { Timer, Play, StopCircle, Download } from "lucide-react";
 import { formatDistanceStrict } from "date-fns";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type LogEntry = {
   'Date': string;
@@ -16,7 +17,6 @@ type LogEntry = {
   'Time Out': string;
   'Duration': string;
   'Student Name/USN': string;
-  'Image': string;
 };
 
 export default function MovementTrackingPage() {
@@ -63,13 +63,9 @@ export default function MovementTrackingPage() {
       'Time Out': endTime.toLocaleTimeString(),
       'Duration': duration,
       'Student Name/USN': `Student_${Date.now()}`, // Simulated student ID
-      'Image': `presence_${Date.now()}.jpg`,
     };
     
-    const updatedLogs = [...logs, newLog];
-    setLogs(updatedLogs);
-    exportToExcel(updatedLogs, "Movement Logs", "movement_tracking_logs");
-
+    setLogs(prevLogs => [...prevLogs, newLog]);
     toast({ title: "Tracking Stopped", description: `Duration: ${duration}. Log has been saved.` });
 
     setIsTracking(false);
@@ -129,6 +125,47 @@ export default function MovementTrackingPage() {
           </Card>
         </div>
       </div>
+      <Card className="mt-6">
+        <CardHeader>
+            <div className="flex items-center justify-between">
+                <CardTitle>Movement Logs</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportToExcel(logs, "Movement Logs", "movement_tracking_logs")} disabled={logs.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Logs
+                </Button>
+            </div>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time In</TableHead>
+                        <TableHead>Time Out</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Student Name/USN</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {logs.length > 0 ? (
+                        logs.map((log, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{log.Date}</TableCell>
+                                <TableCell>{log['Time In']}</TableCell>
+                                <TableCell>{log['Time Out']}</TableCell>
+                                <TableCell>{log.Duration}</TableCell>
+                                <TableCell>{log['Student Name/USN']}</TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={5} className="text-center">No movements logged yet.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

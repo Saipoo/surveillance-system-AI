@@ -13,5 +13,4 @@ export type EmergencyLog = {
   Time: string;
   'Type of Emergency': EmergencyType;
   'Suggested Treatment': string;
-  'Student Image': string;
 };
